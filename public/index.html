@@ -1,0 +1,19 @@
+<html>
+<script src="https://cdn.socket.io/socket.io-1.2.0.js"></script>
+
+<body>
+    <button id="inc" onclick="myFunction()">Increment</button>
+    <script>
+        const socket = io("http://localhost:3000");
+        
+        // Listening updatecount event from server  
+        socket.on('updatecount', (data) => {
+            console.log(count)
+        })
+
+        function myFunction() {
+            socket.emit('increment')// Sending increment event to server 
+        }
+    </script>
+</body>
+<html>
