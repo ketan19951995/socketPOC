@@ -1,11 +1,9 @@
-const http = require('http')
-const Queue = require('bull');
 const express = require('express')
 const app = express();
-const server = http.createServer(http);
-const socketio = require('socket.io')
-const io = socketio(server)
-const path = require('path')
+const http = require('http').Server(app);
+const Queue = require('bull');
+let io = require('socket.io')(http);
+const path = require('path');
 app.use(express.static(path.join(__dirname, '../public')))
 
 
@@ -16,27 +14,6 @@ const processDataQueue = new Queue('processLargeData', {
     }
 });
 
-let count = 0;
-
-io.on('connection', () => {
-    console.log('connected')
-
-    // Send Event
-    socket.emit('updatecount', count)
-
-    // Listening the event and performing logic here 
-    socket.on('increment', () => {
-        console.log("called");
-        count++;
-        io.emit('updatecount', count)
-    })
-
-    // when a client disconnect this function is called 
-    socket.on('disconnect', () => {
-        console.log('server disconnected')
-    })
-})
-
 app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST');
@@ -45,42 +22,53 @@ app.use((req, res, next) => {
 });
 
 
+io.on('connection', () => {
+    console.log('connected')
+
+    io.on('content', () => {
+        // adding a job to queue
+        processDataQueue.add(job);
+     })
+
+    // when a client disconnect this function is called 
+    io.on('disconnect', () => {
+        console.log('server disconnected')
+    })
+})
+
+
+
+app.get('/', (req, res) => {
+    res.sendFile(__dirname + '/public/index.html');
+});
+
 app.post('/test', function (req, res) {
     let job = {
         "title": "test"
     }
-    // adding a job to queue
+
     processDataQueue.add(job);
     res.send({ "message": "ok" })
 });
 
+console.log("process" , processDataQueue)
 // takes 5 minustes to complete
 async function takesTimeToComplete(job) {
-    console.log("inside this");
     return new Promise((resolve, reject) => {
         setTimeout(() => {
             resolve(`${job} done  `);
-        }, 300)
+        }, 30000)
     });
 }
 
 processDataQueue.process(async job => {
     //console.log("job is", job);
-    await takesTimeToComplete(job);
+    let result =  await takesTimeToComplete(job);
+    io.emit('content' , "success event");
     done();
+    
 });
 
-processDataQueue.on('progress', (job, progress) => {
-    console.log("inside this too");
-    console.log(`Job progress with result ${job} ${progress}`);
-    });
-
-
-processDataQueue.on('completed', (job, result) => {
-    console.log(`Job completed with result ${job}`);
-  });
-
-const PORT = 3000
-app.listen(PORT, () => {
-    console.log(`app is listening to PORT ${PORT}`)
-})
+http.listen(3000, function () {
+    console.log('listening on localhost:3000');
+});
